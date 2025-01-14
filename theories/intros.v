@@ -71,25 +71,6 @@ Proof.
       simpl in H; destruct v; simpl in H; discriminate H ].
 Qed.
 
-(* Lemma v_to_e_list_neq_nop : forall vs es es',
-   v_to_e_list vs ++ es = AI_basic BI_nop :: es' -> False.
-Proof.
-   intros vs es es' H.
-   destruct vs; simpl in H.
-   +  *)
-
-(* Lemma opsem_reduce_simple_nop : forall es1 es2,
-   reduce_simple (AI_basic BI_nop :: es1) (AI_basic BI_nop :: es2) -> False.
-Proof.
-   intros es1 es2 H.
-   inversion H; subst;
-   match goal with
-   | H : _ |- _ => solve [
-      apply vref_to_e_neq_nop in H; destruct H |
-      apply v_to_e_neq_nop in H; destruct H]
-   end.
-Qed. *)
-
 Lemma cons_app : forall T (e : T) (l : list T), 
    e :: l = [:: e] ++ l.
 Proof.
@@ -181,6 +162,8 @@ Proof.
       + injection H1 as H1. apply v_to_e_neq_nop in H1. destruct H1. }
 Qed.
 
+(* Is the above true without the const_list assumption?
+   Prove or disprove it by establishing a witness to the following: *)
 Lemma opsem_reduce_seq2':
     {forall s1 f1 es1 s2 f2 es2 es0,
     reduce hs s1 f1 es1 hs s2 f2 es2 ->
@@ -206,61 +189,6 @@ Proof.
       + specialize (opsem_reduce_seq2'_r_label x0 x) as [Hgoal _]. exact Hgoal.
       + specialize (opsem_reduce_seq2'_r_label x0 x) as [_ Hgoal]. exact Hgoal.
 Qed.
-
-(* Is the above true without the const_list assumption?
-   Prove or disprove it by establishing a witness to the following: *)
-Lemma opsem_reduce_seq2':
-    {forall s1 f1 es1 s2 f2 es2 es0,
-    reduce hs s1 f1 es1 hs s2 f2 es2 ->
-    reduce hs s1 f1 (es0 ++ es1) hs s2 f2 (es0 ++ es2)} +
-    {forall es1 es2, exists s1 f1 s2 f2 es0,
-    reduce hs s1 f1 es1 hs s2 f2 es2 /\
-    (reduce hs s1 f1 (es0 ++ es1) hs s2 f2 (es0 ++ es2) -> False)}.
-Proof.
-   apply right.
-   intros es1 es2.
-   set empty_record := Build_store_record [::] [::] [::] [::] [::] [::].
-   exists empty_record. exists empty_frame.
-   exists empty_record. exists empty_frame.
-   exists [::AI_basic BI_nop].
-   remember (AI_basic BI_nop :: es1) as esl.
-   remember (AI_basic BI_nop :: es2) as esr.
-   induction H2; 
-   (* TODO: Name variables *)
-   try solve [discriminate Heqesr |
-              injection Heqesl as Hcontra; discriminate Hcontra |
-              injection Heqesr as Hcontra; discriminate Hcontra ];
-   subst.
-   - eapply opsem_reduce_simple_nop. exact H.
-   - unfold result_to_stack in Heqesr. destruct r eqn:Er.
-      + destruct l eqn:El.
-         * simpl in Heqesr. discriminate Heqesr.
-         * simpl in Heqesr. injection Heqesr as Heqesr.
-           apply v_to_e_neq_nop in Heqesr. destruct Heqesr.
-   - injection Heqesr as Heqesr. discriminate Heqesr.
-   - apply IHreduce; clear IHreduce.
-      + exact H1.
-      + admit.
-      + admit.
-Admitted.
-(* 
-   apply right.
-   set empty_record := Build_store_record [::] [::] [::] [::] [::] [::].
-   exists empty_record. exists empty_frame.
-   exists [::].
-   exists empty_record. exists empty_frame.
-   exists [::]. exists [::AI_basic BI_nop].
-   simpl. intros H1 H2.
-   
-   inversion H2; subst.
-   - inversion H.
-   - rewrite -> H in H0. injection H0 as H0. discriminate H0.
-   - rewrite -> H in H0. injection H0 as H0. discriminate H0.
-   - rewrite -> H in H0. injection H0 as H0. discriminate H0.
-   (* - simpl in H3. unfold lookup_N in H3. Check List.nth_error_None. *)
-   - admit.
-   - rewrite -> H in H0. injection H0 as H0. discriminate H0.
-   - admit. *)
 
 End intro_opsem.
 
