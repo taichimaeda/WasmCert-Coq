@@ -71,7 +71,14 @@ Proof.
       simpl in H; destruct v; simpl in H; discriminate H ].
 Qed.
 
-Lemma opsem_reduce_simple_nop : forall es1 es2,
+(* Lemma v_to_e_list_neq_nop : forall vs es es',
+   v_to_e_list vs ++ es = AI_basic BI_nop :: es' -> False.
+Proof.
+   intros vs es es' H.
+   destruct vs; simpl in H.
+   +  *)
+
+(* Lemma opsem_reduce_simple_nop : forall es1 es2,
    reduce_simple (AI_basic BI_nop :: es1) (AI_basic BI_nop :: es2) -> False.
 Proof.
    intros es1 es2 H.
@@ -81,6 +88,123 @@ Proof.
       apply vref_to_e_neq_nop in H; destruct H |
       apply v_to_e_neq_nop in H; destruct H]
    end.
+Qed. *)
+
+Lemma cons_app : forall T (e : T) (l : list T), 
+   e :: l = [:: e] ++ l.
+Proof.
+   intros T e1 e2. reflexivity.
+Qed.
+
+Lemma middle_neq_empty : forall (T : Type) (x : T) (l1 l2 : list T),
+  l1 ++ [:: x] ++ l2 <> [::].
+Proof.
+  intros T x l1 l2 H.
+  destruct l1; simpl in H; discriminate H.
+Qed.
+
+Lemma middle2_left_empty : forall (T : Type) (x y x' y' : T) (l1 l2 : list T),
+  l1 ++ [:: x; y] ++ l2 = [:: x'; y'] -> l1 = [::].
+Proof.
+  intros T x y x' y' l1 l2 H.
+  destruct l1.
+   - reflexivity.
+   - injection H as ? H.
+     destruct l1.
+     + injection H as ? H. discriminate H.
+     + injection H as ? H. 
+       assert (Heq : l1 ++ [:: x, y & l2] = l1 ++ [:: x] ++ y :: l2) by trivial.
+       rewrite -> Heq in H. clear Heq.
+       apply middle_neq_empty with (l2 := y :: l2) in H. destruct H.
+Qed.
+
+Lemma middle2_right_empty : forall (T : Type) (x y x' y' : T) (l1 l2 : list T), 
+  l1 ++ [:: x; y] ++ l2 = [:: x'; y'] -> l2 = [::].
+Proof.
+  intros T x y x' y' l1 l2 H.
+  specialize (middle2_left_empty H) as Hl1. rewrite -> Hl1 in H. simpl in H.
+  injection H as ? ? H. exact H.
+Qed.
+
+Lemma opsem_reduce_seq2'_tail_eq_empty : forall l1 l2 l,
+   l1 ++ l = [:: AI_basic BI_nop; AI_basic BI_unreachable] -> 
+   l2 ++ l = [:: AI_basic BI_nop; AI_trap] -> l = [::].
+Proof.
+   intros l1 l2 l H1 H2.
+   destruct l as [|e l'] eqn:El; simpl in H1, H2.
+   - reflexivity.
+   - destruct l' as [|e' l''] eqn:El'; simpl in H1, H2.
+      + rewrite -> cons_app with (l := [:: AI_basic BI_unreachable]) in H1.
+        rewrite -> cons_app with (l := [:: AI_trap]) in H2.
+        apply List.app_inj_tail in H1. destruct H1 as [_ H1].
+        apply List.app_inj_tail in H2. destruct H2 as [_ H2].
+        rewrite -> H1 in H2. discriminate H2.
+      + assert (Heq1 : l1 ++ [:: e, e' & l''] = l1 ++ [:: e; e'] ++ l'') by trivial.
+        assert (Heq2 : l2 ++ [:: e, e' & l''] = l2 ++ [:: e; e'] ++ l'') by trivial.
+        rewrite -> Heq1 in H1. clear Heq1.
+        rewrite -> Heq2 in H2. clear Heq2.
+        specialize (middle2_left_empty H1) as Hl1.
+        specialize (middle2_right_empty H2) as Hl2. subst.
+        simpl in H1, H2.
+        injection H1 as He He'. rewrite -> He' in H2.
+        rewrite -> cons_app with (l := [:: AI_basic BI_unreachable]) in H2.
+        rewrite -> cons_app with (l := [:: AI_trap]) in H2.
+        rewrite -> List.app_assoc in H2.
+        apply List.app_inj_tail in H2. destruct H2 as [_ H2]. discriminate H2.
+Qed.
+
+Lemma opsem_reduce_seq2'_r_label : forall k (lh : lholed k) es1 es2,
+   lfill lh es1 = [:: AI_basic BI_nop;  AI_basic BI_unreachable] ->
+   lfill lh es2 = [:: AI_basic BI_nop;  AI_trap] -> 
+   es1 = [:: AI_basic BI_nop;  AI_basic BI_unreachable] /\ es2 = [:: AI_basic BI_nop;  AI_trap].
+Proof.
+   intros k lh es1 es2 H1 H2. split.
+   { destruct lh as [vs es |k vs n cont lh' es] eqn:Elh; simpl in H1, H2.
+      - rewrite -> List.app_assoc in H1, H2;
+      specialize (opsem_reduce_seq2'_tail_eq_empty H1 H2) as Hes;
+      rewrite -> Hes in H1, H2; rewrite -> List.app_nil_r in H1, H2.
+      destruct vs as [|v vs'] eqn:Evs; simpl in H1, H2.
+      + exact H1.
+      + injection H1 as H1. apply v_to_e_neq_nop in H1. destruct H1.
+      - destruct vs as [|v vs'] eqn:Evs; simpl in H1, H2.
+      + injection H1 as H1. discriminate H1.
+      + injection H1 as H1. apply v_to_e_neq_nop in H1. destruct H1. }
+   { destruct lh as [vs es |k vs n cont lh' es] eqn:Elh; simpl in H1, H2.
+      - rewrite -> List.app_assoc in H1, H2;
+      specialize (opsem_reduce_seq2'_tail_eq_empty H1 H2) as Hes;
+      rewrite -> Hes in H1, H2; rewrite -> List.app_nil_r in H1, H2.
+      destruct vs as [|v vs'] eqn:Evs; simpl in H1, H2.
+      + exact H2.
+      + injection H1 as H1. apply v_to_e_neq_nop in H1. destruct H1.
+      - destruct vs as [|v vs'] eqn:Evs; simpl in H1, H2.
+      + injection H1 as H1. discriminate H1.
+      + injection H1 as H1. apply v_to_e_neq_nop in H1. destruct H1. }
+Qed.
+
+Lemma opsem_reduce_seq2':
+    {forall s1 f1 es1 s2 f2 es2 es0,
+    reduce hs s1 f1 es1 hs s2 f2 es2 ->
+    reduce hs s1 f1 (es0 ++ es1) hs s2 f2 (es0 ++ es2)} +
+    {exists s1 f1 es1 s2 f2 es2 es0,
+    (reduce hs s1 f1 es1 hs s2 f2 es2 ->
+     reduce hs s1 f1 (es0 ++ es1) hs s2 f2 (es0 ++ es2)) -> False}.
+Proof.
+   apply right.
+   set empty_record := Build_store_record [::] [::] [::] [::] [::] [::].
+   exists empty_record. exists empty_frame. exists [:: AI_basic BI_unreachable].
+   exists empty_record. exists empty_frame. exists [:: AI_trap].
+   exists [:: AI_basic BI_nop].
+   simpl. intros H.
+   specialize (H (r_simple _ _ _ rs_unreachable)).
+   dependent induction H.
+   (* TODO: Name x0 and x properly *)
+   - inversion H.
+   - destruct vcs in x0; simpl in x0.
+      + discriminate x0.
+      + injection x0 as x0. apply v_to_e_neq_nop in x0. destruct x0.
+   - apply IHreduce; clear IHreduce; try reflexivity.
+      + specialize (opsem_reduce_seq2'_r_label x0 x) as [Hgoal _]. exact Hgoal.
+      + specialize (opsem_reduce_seq2'_r_label x0 x) as [_ Hgoal]. exact Hgoal.
 Qed.
 
 (* Is the above true without the const_list assumption?
@@ -91,7 +215,7 @@ Lemma opsem_reduce_seq2':
     reduce hs s1 f1 (es0 ++ es1) hs s2 f2 (es0 ++ es2)} +
     {forall es1 es2, exists s1 f1 s2 f2 es0,
     reduce hs s1 f1 es1 hs s2 f2 es2 /\
-    reduce hs s1 f1 (es0 ++ es1) hs s2 f2 (es0 ++ es2) -> False}.
+    (reduce hs s1 f1 (es0 ++ es1) hs s2 f2 (es0 ++ es2) -> False)}.
 Proof.
    apply right.
    intros es1 es2.
@@ -99,7 +223,6 @@ Proof.
    exists empty_record. exists empty_frame.
    exists empty_record. exists empty_frame.
    exists [::AI_basic BI_nop].
-   simpl. intros [H1 H2].
    remember (AI_basic BI_nop :: es1) as esl.
    remember (AI_basic BI_nop :: es2) as esr.
    induction H2; 
